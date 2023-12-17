@@ -166,6 +166,38 @@ INGRESS_HOST="$(kubectl get gateway istio-gateway \
 curl -v "http://$INGRESS_HOST"
 ```
 
+## Istio Dashboards with Kiali, Prometheus & Grafana
+
+After all the pods are ready, the Gateway has an IP, and the services are active, it's possible to generate different kinds of dashboards using `istioctl`. The `addons` from the kubernetes-labs will be used for this, and have been added to the `istio` directory of this repository. The contents of the istio directory include:
+
+```
+.
+├── extras
+│   ├── prometheus-operator.yaml
+│   ├── prometheus_vm_tls.yaml
+│   ├── prometheus_vm.yaml
+│   ├── skywalking.yaml
+│   └── zipkin.yaml
+├── grafana.yaml
+├── jaeger.yaml
+├── kiali.yaml
+├── loki.yaml
+├── prometheus.yaml
+└── README.md
+```
+
+after doing an apply with `kubectl apply -f .` in the istio directory, the dashboards can be generated with:
+
+* istioctl dashboard kiali
+* istioctl dashboard prometheus
+* istioctl dashboard grafana
+
+Results:
+
+### Kiali Dashboard
+### Prometheus Dashboard
+### Grafana Dashboard
+
 ## Using Google-managd SSL certificates for HTTPS
 
 To configure a Google-managed SSL certificate and associate it with an Ingress, you need to:
@@ -197,8 +229,6 @@ spec:
 ```
 
 Afterwards, a `ManagedCertificate` Resource is created, and applied. 
-
-```
 
 ```yaml
 apiVersion: networking.gke.io/v1
