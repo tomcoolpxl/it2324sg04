@@ -2,7 +2,7 @@
 
 You can use [Istio](https://istio.io) to enable [service mesh features](https://cloud.google.com/service-mesh/docs/overview) such as traffic management, observability, and security. Istio can be provisioned using Anthos Service Mesh (ASM), the Open Source Software (OSS) istioctl tool, or via other Istio providers. You can then label individual namespaces for sidecar injection and configure an Istio gateway to replace the frontend-external load balancer.
 
-# Provision a GKE Cluster
+## Provision a GKE Cluster
  
 Create a GKE cluster with at least 4 nodes, machine type `e2-standard-4`, [GKE Workload Identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity), and the [Kubernetes Gateway API resources](https://cloud.google.com/kubernetes-engine/docs/how-to/deploying-gateways):
 
@@ -22,9 +22,9 @@ gcloud container clusters create ${CLUSTER_NAME} \
     --gateway-api "standard"
 ```
 
-# Provision and Configure Istio Service Mesh
+## Provision and Configure Istio Service Mesh
 
-## Provision OSS `Istio` via istioctl
+### Provision OSS `Istio` via istioctl
 
 Provision the cluster with Istioctl by entering the following commands:
 
@@ -48,9 +48,9 @@ gcloud compute firewall-rules update gke-onlineboutique-c94d71e8-master \
     --allow tcp:10250,tcp:443,tcp:15017
 ```
 
-# Deploy and Validate Online Boutique with `Istio`
+## Deploy and Validate Online Boutique with `Istio`
 
-## Deploy via Kustomize component
+### Deploy via Kustomize component
 
 Once the service mesh and namespace injection are configured, you can then deploy the Istio manifests using Kustomize. You should also include the [service-accounts component](../service-accounts) if you plan on using AuthorizationPolicies.
 
@@ -118,7 +118,7 @@ serviceentry.networking.istio.io/allow-egress-googleapis created
 virtualservice.networking.istio.io/frontend created
 ```
 
-# Verify Online Boutique Deployment
+## Verify Online Boutique Deployment
 
 Run `kubectl get pods,gateway,svc` to see pods and gateway are in a healthy and ready state.
 
@@ -166,3 +166,66 @@ INGRESS_HOST="$(kubectl get gateway istio-gateway \
 curl -v "http://$INGRESS_HOST"
 ```
 
+## Using Google-managd SSL certificates for HTTPS
+
+To configure a Google-managed SSL certificate and associate it with an Ingress, you need to:
+
+* Create a `ManagedCertificate` object in the same namespace as the Ingress.
+* Associate the ManagedCertificate object to an Ingress by adding the `networking.gke.io/managed-certificates` annotation to the Ingress. This annotation is a comma-separated list of ManagedCertificate objects.
+
+It's important that the Gateway has a HTTPRoute hostname associated with it, before creating a managedcert. These hostnames are added under the HTTPRoute resource:
+
+```yaml
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: frontend-route
+spec:
+  parentRefs:
+  - name: istio-gateway
+  hostnames:
+  - "onlineboutique.duckdns.org"
+  - "www.onlineboutique.duckdns.org" 
+  rules:
+  - matches:
+    - path:
+        value: /
+    backendRefs:
+    - name: frontend
+      port: 80
+```
+
+Afterwards, a `ManagedCertificate` Resource is created, and applied. 
+
+```
+
+```yaml
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: online-boutique-cert
+spec:
+  domains:
+    - onlineboutique.duckdns.org
+```
+
+After applying the certifate, and waiting for the certificate to become provisioned, the networking annotation is added to the Gateway, before updating the gateway. 
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: istio-gateway
+  annotations:
+    networking.gke.io/managed-certificates: online-boutique-cert
+spec:
+  gatewayClassName: istio
+  listeners:
+  - name: http
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: Same
+```
