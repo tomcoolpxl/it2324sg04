@@ -208,6 +208,33 @@ To configure a Google-managed SSL certificate and associate it with an Ingress, 
 It's important that the Gateway has a HTTPRoute hostname associated with it, before creating a managedcert. These hostnames are added under the HTTPRoute resource:
 
 ```yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: istio-gateway
+spec:
+  gatewayClassName: istio
+  listeners:
+  # - name: http
+  #   port: 80
+  #   protocol: HTTP
+  #   allowedRoutes:
+  #     namespaces:
+  #       from: Same
+  - name: https
+    hostname: "onlineboutique.duckdns.org"
+    port: 443
+    protocol: HTTPS
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: boutique-credential
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            kubernetes.io/metadata.name: default
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: HTTPRoute
@@ -216,9 +243,7 @@ metadata:
 spec:
   parentRefs:
   - name: istio-gateway
-  hostnames:
-  - "onlineboutique.duckdns.org"
-  - "www.onlineboutique.duckdns.org" 
+  hostnames: ["onlineboutique.duckdns.org"]
   rules:
   - matches:
     - path:
@@ -226,6 +251,7 @@ spec:
     backendRefs:
     - name: frontend
       port: 80
+
 ```
 
 Afterwards, a `ManagedCertificate` Resource is created, and applied. 
