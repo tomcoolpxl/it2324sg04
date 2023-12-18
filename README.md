@@ -253,35 +253,3 @@ spec:
       port: 80
 
 ```
-
-Afterwards, a `ManagedCertificate` Resource is created, and applied. 
-
-```yaml
-apiVersion: networking.gke.io/v1
-kind: ManagedCertificate
-metadata:
-  name: online-boutique-cert
-spec:
-  domains:
-    - onlineboutique.duckdns.org
-```
-
-After applying the certifate, and waiting for the certificate to become provisioned, the networking annotation is added to the Gateway, before updating the gateway. 
-
-```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
-kind: Gateway
-metadata:
-  name: istio-gateway
-  annotations:
-    networking.gke.io/managed-certificates: online-boutique-cert
-spec:
-  gatewayClassName: istio
-  listeners:
-  - name: http
-    port: 80
-    protocol: HTTP
-    allowedRoutes:
-      namespaces:
-        from: Same
-```
