@@ -1,8 +1,8 @@
-# Istio Service Mesh
+## Istio Service Mesh
 
 You can use [Istio](https://istio.io) to enable [service mesh features](https://cloud.google.com/service-mesh/docs/overview) such as traffic management, observability, and security. Istio can be provisioned using Anthos Service Mesh (ASM), the Open Source Software (OSS) istioctl tool, or via other Istio providers. You can then label individual namespaces for sidecar injection and configure an Istio gateway to replace the frontend-external load balancer.
 
-## Provision a GKE Cluster
+### Provision a GKE Cluster
  
 Create a GKE cluster with at least 4 nodes, machine type `e2-standard-4`, [GKE Workload Identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity), and the [Kubernetes Gateway API resources](https://cloud.google.com/kubernetes-engine/docs/how-to/deploying-gateways):
 
@@ -22,9 +22,9 @@ gcloud container clusters create ${CLUSTER_NAME} \
     --gateway-api "standard"
 ```
 
-## Provision and Configure Istio Service Mesh
+### Provision and Configure Istio Service Mesh
 
-### Provision OSS `Istio` via istioctl
+#### Provision OSS `Istio` via istioctl
 
 Provision the cluster with Istioctl by entering the following commands:
 
@@ -48,9 +48,9 @@ gcloud compute firewall-rules update gke-onlineboutique-c94d71e8-master \
     --allow tcp:10250,tcp:443,tcp:15017
 ```
 
-## Deploy and Validate Online Boutique with `Istio`
+### Deploy and Validate Online Boutique with `Istio`
 
-### Deploy via Kustomize component
+#### Deploy via Kustomize component
 
 Once the service mesh and namespace injection are configured, you can then deploy the Istio manifests using Kustomize. You should also include the [service-accounts component](../service-accounts) if you plan on using AuthorizationPolicies.
 
@@ -118,7 +118,7 @@ serviceentry.networking.istio.io/allow-egress-googleapis created
 virtualservice.networking.istio.io/frontend created
 ```
 
-## Verify Online Boutique Deployment
+### Verify Online Boutique Deployment
 
 Run `kubectl get pods,gateway,svc` to see pods and gateway are in a healthy and ready state.
 
@@ -166,7 +166,7 @@ INGRESS_HOST="$(kubectl get gateway istio-gateway \
 curl -v "http://$INGRESS_HOST"
 ```
 
-## Istio Dashboards with Kiali, Prometheus & Grafana
+### Istio Dashboards with Kiali, Prometheus & Grafana
 
 After all the pods are ready, the Gateway has an IP, and the services are active, it's possible to generate different kinds of dashboards using `istioctl`. The `addons` from the kubernetes-labs will be used for this, and have been added to the `istio` directory of this repository. The contents of the istio directory include:
 
@@ -194,18 +194,45 @@ after doing an apply with `kubectl apply -f .` in the istio directory, the dashb
 
 Results:
 
-### Kiali Dashboard
-### Prometheus Dashboard
-### Grafana Dashboard
+#### Kiali Dashboard
+#### Prometheus Dashboard
+#### Grafana Dashboard
 
-## Using Google-managd SSL certificates for HTTPS
+### Secure Gateways & HTTPS
 
-To configure a Google-managed SSL certificate and associate it with an Ingress, you need to:
+The Control Ingress Traffic task describes how to configure an ingress gateway to expose an HTTP service to external traffic. This task shows how to expose a secure HTTPS service using either simple or mutual TLS.
 
-* Create a `ManagedCertificate` object in the same namespace as the Ingress.
-* Associate the ManagedCertificate object to an Ingress by adding the `networking.gke.io/managed-certificates` annotation to the Ingress. This annotation is a comma-separated list of ManagedCertificate objects.
+#### Generating certificates and keys
 
-It's important that the Gateway has a HTTPRoute hostname associated with it, before creating a managedcert. These hostnames are added under the HTTPRoute resource:
+```sh
+#Create a root certificate and private key to sign the certificates for your services:
+openssl req -x509 -sha256 -nodes -days 365 \
+-newkey rsa:2048 -subj '/O=Fortiboutique Inc./CN=onlineboutique.duckdns.org' \
+-keyout boutique_certs/boutique.selfsign.key -out boutique_certs/boutique.selfsign.crt
+
+#Generate a certificate and a private key for onlineboutique.duckdns.org
+#Command 1:
+openssl req -out boutique_certs/boutique.com.csr \
+-newkey rsa:2048 -nodes -keyout boutique_certs/boutique.com.key \
+-subj "/CN=onlineboutique.duckdns.org/O=Fortiboutique organization"
+
+#Command 2:                                                                                                                     
+openssl x509 -req -sha256 -days 365 -CA boutique_certs/boutique.selfsign.crt \
+-CAkey boutique_certs/boutique.selfsign.key -set_serial 0 \
+-in boutique_certs/boutique.com.csr -out boutique_certs/boutique.com.crt
+```
+
+Finally, once the certificates exist, these can be created as a usable secret in the cluster:                                                                                                                              
+
+```sh                       
+kubectl create secret tls boutique-credential \
+--key=boutique_certs/boutique.com.key \
+--cert=boutique_certs/boutique.com.crt
+```
+
+The Gateway for the frontend, as well as the HTTPRoute can reference the name of the secret when referencing the certificate. In this case, the secret has the identifier `boutique-credential`, which is referenced under `certificateRefs`.
+
+Simultaneously, Port 80, and HTTP traffic can be disabled. 
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
