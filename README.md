@@ -193,33 +193,42 @@ after doing an apply with `kubectl apply -f .` in the istio directory, the dashb
 * istioctl dashboard grafana
 
 Results:
+The kiali dashboard shows `mTLS` encryption between the pods. 
 
 #### Kiali Dashboard
-#### Prometheus Dashboard
+![kiali](./assets/images/kiali_dash.png)
+
 #### Grafana Dashboard
+![grafana](./assets/images/grafana_dash.png)
 
-### Secure Gateways & HTTPS
+## Secure Gateways & HTTPS
 
-The Control Ingress Traffic task describes how to configure an ingress gateway to expose an HTTP service to external traffic. This task shows how to expose a secure HTTPS service using either simple or mutual TLS.
+The Control Ingress Traffic task describes how to configure an ingress gateway to expose an HTTP service to external traffic. This task shows how to expose a secure HTTPS service using either simple or mutual TLS. Mutual TLS, or mTLS for short, is a method for `mutual authentication`. mTLS ensures that the parties at each end of a network connection are who they claim to be by verifying that they both have the correct private key. The information within their respective TLS certificates provides additional verification.
 
-#### Generating certificates and keys
+### Generating certificates and keys
 
 ```sh
 #Create a root certificate and private key to sign the certificates for your services:
 openssl req -x509 -sha256 -nodes -days 365 \
--newkey rsa:2048 -subj '/O=Fortiboutique Inc./CN=onlineboutique.duckdns.org' \
--keyout boutique_certs/boutique.selfsign.key -out boutique_certs/boutique.selfsign.crt
+-newkey rsa:2048 \
+-subj '/O=Fortiboutique Inc./CN=onlineboutique.duckdns.org' \
+-keyout boutique_certs/boutique.selfsign.key \
+-out boutique_certs/boutique.selfsign.crt
 
 #Generate a certificate and a private key for onlineboutique.duckdns.org
 #Command 1:
 openssl req -out boutique_certs/boutique.com.csr \
--newkey rsa:2048 -nodes -keyout boutique_certs/boutique.com.key \
+-newkey rsa:2048 -nodes \
+-keyout boutique_certs/boutique.com.key \
 -subj "/CN=onlineboutique.duckdns.org/O=Fortiboutique organization"
 
 #Command 2:                                                                                                                     
-openssl x509 -req -sha256 -days 365 -CA boutique_certs/boutique.selfsign.crt \
--CAkey boutique_certs/boutique.selfsign.key -set_serial 0 \
--in boutique_certs/boutique.com.csr -out boutique_certs/boutique.com.crt
+openssl x509 -req -sha256 -days 365 \
+-CA boutique_certs/boutique.selfsign.crt \
+-CAkey boutique_certs/boutique.selfsign.key \
+-set_serial 0 \
+-in boutique_certs/boutique.com.csr \
+-out boutique_certs/boutique.com.crt
 ```
 
 Finally, once the certificates exist, these can be created as a usable secret in the cluster:                                                                                                                              
@@ -228,6 +237,23 @@ Finally, once the certificates exist, these can be created as a usable secret in
 kubectl create secret tls boutique-credential \
 --key=boutique_certs/boutique.com.key \
 --cert=boutique_certs/boutique.com.crt
+```
+
+The secret will be created for the default namespace, and contains the certificate and key:
+
+```
+Name:         boutique-credential
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Type:  kubernetes.io/tls
+
+Data
+====
+tls.crt:  1103 bytes
+tls.key:  1700 bytes
+
 ```
 
 The Gateway for the frontend, as well as the HTTPRoute can reference the name of the secret when referencing the certificate. In this case, the secret has the identifier `boutique-credential`, which is referenced under `certificateRefs`.
@@ -242,7 +268,7 @@ metadata:
 spec:
   gatewayClassName: istio
   listeners:
-  # - name: http
+  # - name: http                 <-- Disabled to disallow traffic over port 80
   #   port: 80
   #   protocol: HTTP
   #   allowedRoutes:
@@ -280,3 +306,20 @@ spec:
       port: 80
 
 ```
+The webpage shows that the HTTPS connection is now working:
+![https](./assets/images/https_verify.png)
+
+With HTTPS traffic it is now more difficult to identify personal information when monitoring the network traffic. Below is an example of a checkout on the online store, whilst network traffic is being watched with Wireshark:
+
+![checkout](./assets/images/online_checkout.png)
+
+![wireshark](./assets/images/encrypted_traffic.png)
+
+## Snyk
+![snyk](./assets/images/snyk_dash.png)
+
+TODO
+
+## Vault
+
+TODO
