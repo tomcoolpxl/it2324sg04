@@ -316,9 +316,53 @@ With HTTPS traffic it is now more difficult to identify personal information whe
 ![wireshark](./assets/images/encrypted_traffic.png)
 
 ## Snyk
+
+Snyk allows a lot of integrations. The three we will focus on are gcr, dockerhub and github.
+![snyk](./assets/images/SnykIntegrations.PNG)
+
+## GCR integration
+To enable Snyk on google cloud we need to create service account for Snyk.
+Fist we must ensure that Cloud Resource Manager API is enabled on our project.
+(add photo)
+
+After enableing the Cloud Resource Manager API we create a service account with the Storage Object Viewer permissions.
+(add photo)
+
+When the service account is created we can create an api key for the account to use for the Snyk integration.
+(add photo)
+
+We can use the created api key to create the integration. In our example our GCR hostname is gcr.io.
+![snyk](./assets/images/Snyk_gcr_integration.PNG)
+
+When the integration is succesfull we can add specific images used in our google cloud project and monitor the security flaws for these images.
+![snyk](./assets/images/Snyk_gcr_integration_images.PNG)
+
+## Dockerhub integration
+To integrate dockerhub hosted images we follow the guide provided by Snyk.
+First we create an access token for our dockerhub account.
+![docker](./assets/images/Dockerhub_access_token.PNG)
+![docker](./assets/images/Dockerhub_access_token2.PNG)
+
+After creating the token we use it in the integration of Snyk for docker.
+![docker](./assets/images/Docker_integration.PNG)
+
+When the integration is succesfull, we can add docker images to scan for vulnerabilities. These can be your own docker images or publicly hosted images.
+![docker](./assets/images/Docker_integration_images.PNG)
+
+## Github integration
+When integration github you will get prompted to login to github and allow Snyk to use specific resources.
+After logging in, we can choose wich github repos we want to add to our Snyk project.
+![github](./assets/images/Gihtub_project_integration.PNG)
+
+After a succesfull integration we get prompted on the dashboard to create pull requests to fix security issues.
+![github](./assets/images/Github_snyk_pr.png)
+![github](./assets/images/Github_snyk_pr2.png)
+![github](./assets/images/Github_snyk_pr_commits.png)
+
+
+After these integrations a preview of all security issues can be viewed on the projects tab of the Snyk interface.
 ![snyk](./assets/images/snyk_dash.png)
 
-TODO
 
 ## Vault
 
