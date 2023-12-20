@@ -1,3 +1,14 @@
+# SNB4 Security Pillar Documentation
+
+### Contents:
+
+1. [Istio Service Mesh](#istio-service-mesh)
+2. [Secure Gateways - HTTPS](#secure-gateways--https)
+3. [Snyk: GCR monitoring](#snyk-gcr-monitoring)
+4. [Implementing the Vault Operator](#implementing-the-vault-operator)
+5. [Armosec: E2E Kubernetes Security & Compliance](#armosec-e2e-kubernetes-security--compliance)
+6. [Redis & Encryption for Data at Rest](#redis--encryption-at-rest)
+
 ## Istio Service Mesh
 
 You can use [Istio](https://istio.io) to enable [service mesh features](https://cloud.google.com/service-mesh/docs/overview) such as traffic management, observability, and security. Istio can be provisioned using Anthos Service Mesh (ASM), the Open Source Software (OSS) istioctl tool, or via other Istio providers. You can then label individual namespaces for sidecar injection and configure an Istio gateway to replace the frontend-external load balancer.
@@ -315,12 +326,12 @@ With HTTPS traffic it is now more difficult to identify personal information whe
 
 ![wireshark](./assets/images/encrypted_traffic.png)
 
-## Snyk
+## Snyk: GCR monitoring
 
 Snyk allows a lot of integrations. The three we will focus on are gcr, dockerhub and github.
 ![snyk](./assets/images/SnykIntegrations.PNG)
 
-## GCR integration
+### GCR integration
 To enable Snyk on google cloud we need to create service account for Snyk.
 Fist we must ensure that Cloud Resource Manager API is enabled on our project.
 (add photo)
@@ -337,7 +348,7 @@ We can use the created api key to create the integration. In our example our GCR
 When the integration is succesfull we can add specific images used in our google cloud project and monitor the security flaws for these images.
 ![snyk](./assets/images/Snyk_gcr_integration_images.PNG)
 
-## Dockerhub integration
+### Dockerhub integration
 To integrate dockerhub hosted images we follow the guide provided by Snyk.
 First we create an access token for our dockerhub account.
 ![docker](./assets/images/Dockerhub_access_token.PNG)
@@ -349,7 +360,7 @@ After creating the token we use it in the integration of Snyk for docker.
 When the integration is succesfull, we can add docker images to scan for vulnerabilities. These can be your own docker images or publicly hosted images.
 ![docker](./assets/images/Docker_integration_images.PNG)
 
-## Github integration
+### Github integration
 When integration github you will get prompted to login to github and allow Snyk to use specific resources.
 After logging in, we can choose wich github repos we want to add to our Snyk project.
 ![github](./assets/images/Gihtub_project_integration.PNG)
@@ -364,6 +375,165 @@ After these integrations a preview of all security issues can be viewed on the p
 ![snyk](./assets/images/snyk_dash.png)
 
 
-## Vault
+## Implementing the Vault Operator
+![vault](./assets/images/vault_operator.png)
 
-TODO
+The prerequisites include an existing cluster. 
+The [Vault Secrets Operator](https://developer.hashicorp.com/vault/tutorials/kubernetes/vault-secrets-operator) tutorial was followed for this part, and some files from that repository were used:
+
+```sh
+git clone https://github.com/hashicorp-education/learn-vault-secrets-operator.git
+cd learn-vault-secrets-operator
+```
+
+### Configure Vault
+
+We can install Vault in it's own virtual cluster namespace:
+
+```sh
+helm repo add hashicorp https://helm.releases.hashicorp.com
+helm repo update
+helm search repo hashicorp/vault
+helm install vault hashicorp/vault -n vault --create-namespace --values vault/vault-values.yaml
+```
+
+The last command install vault with a config file that the tutorial provides:
+
+```yaml
+server:
+  dev:
+    enabled: true
+    devRootToken: "root"
+  logLevel: debug
+  # service:
+  #   enabled: true
+  #   type: ClusterIP
+  #   # Port on which Vault server is listening
+  #   port: 8200
+  #   # Target port to which the service should be mapped to
+  #   targetPort: 8200
+ui:
+  enabled: true
+  serviceType: "LoadBalancer"
+  externalPort: 8200
+
+injector:
+  enabled: "false"
+```
+
+This enables the UI for easier secret management. To configure Vault we execute vault configuration commands inside the Vault pod:
+
+```sh
+#Enter the pod
+kubectl exec --stdin=true --tty=true vault-0 -n vault -- /bin/sh
+
+#Enable kubernetes auth method
+vault auth enable -path demo-auth-mount kubernetes
+
+#Configure the auth method
+vault write auth/demo-auth-mount/config \
+    kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443"
+
+#Enable the kv v2 Secrets Engine
+vault secrets enable -path=kvv2 kv-v2
+
+#Create a read only policy
+vault policy write dev - <<EOF
+path "kvv2/*" {
+   capabilities = ["read"]
+}
+EOF
+
+#Create a role in Vault to enable access to secret
+vault write auth/demo-auth-mount/role/role1 \
+   bound_service_account_names=default \
+   bound_service_account_namespaces=default \
+   policies=dev \
+   audience=vault \
+   ttl=24h
+
+#Add the certs to Vault
+vault kv put kvv2/frontend_gateway/certs tls.crt="<certificate>" tls.key="<key>"
+exit
+```
+
+### Install the Vault Secrets Operator
+
+Use helm to deploy the Vault Secrets Operator.
+
+```sh
+helm install vault-secrets-operator hashicorp/vault-secrets-operator -n vault-secrets-operator-system --create-namespace --values vault/vault-operator-values.yaml
+```
+
+The contents of the `vault-operator-values` are: 
+
+```yaml
+defaultVaultConnection:
+  enabled: true
+  address: "http://vault.vault.svc.cluster.local:8200"
+  skipTLSVerify: false
+controller:
+  manager:
+    clientCache:
+      persistenceModel: direct-encrypted
+      storageEncryption:
+        enabled: true
+        mount: demo-auth-mount
+        keyName: vso-client-cache
+        transitMount: demo-transit
+        kubernetes:
+          role: auth-role-operator
+          serviceAccount: demo-operator
+```
+
+This establishes the communication with the vault service.
+
+### Deploy and sync a secret
+
+To deploy the secret, use:
+
+```sh
+kubectl apply -f vault/vault-auth-static.yaml
+```
+
+The contents of the `vault-auth-static` file are:
+
+```yaml
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultAuth
+metadata:
+  name: static-auth
+  namespace: default 
+spec:
+  method: kubernetes
+  mount: demo-auth-mount
+  kubernetes:
+    role: role1
+    serviceAccount: default
+    audiences:
+      - vault
+```
+
+Be sure to match the namespace where you want to use the secret. Finally, the secret can be referenced in the frontend Gateway:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+...
+- name: https
+  hostname: "onlineboutique.duckdns.org"
+  port: 443
+  protocol: HTTPS
+  tls:
+    mode: Terminate
+    certificateRefs:
+    - name: secretkv     #<-- reference the secret
+...
+```
+## Armosec: E2E Kubernetes Security & Compliance
+
+```sh
+helm repo add kubescape https://kubescape.github.io/helm-charts/ ; helm repo update ; helm upgrade --install kubescape kubescape/kubescape-operator -n kubescape --create-namespace --set clusterName=`kubectl config current-context` --set account=6f5b87ed-38d2-4bc0-b5d6-fb3fa2c80d23 --set server=api.armosec.io
+```
+
+## Redis & Encryption at Rest
