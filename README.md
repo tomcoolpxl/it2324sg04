@@ -536,6 +536,15 @@ kind: Gateway
 helm repo add kubescape https://kubescape.github.io/helm-charts/ ; helm repo update ; helm upgrade --install kubescape kubescape/kubescape-operator -n kubescape --create-namespace --set clusterName=`kubectl config current-context` --set account=6f5b87ed-38d2-4bc0-b5d6-fb3fa2c80d23 --set server=api.armosec.io
 ```
 
+The comand above installs the kubescape operator on the cluster. So that it can be used to scan the cluster for vulnerabilities.
+
+The `account` and `server` values are obtained from the Armosec console. The `clusterName` is the name of the cluster, which can be obtained with `kubectl config current-context`.
+
+We use kubespace to scan the cluster for vulnerabilities. 
+
+![armosec](./assets/images/armosec.png)
+![armosec2](./assets/images/armosec2.png)
+
 ## Redis & Encryption at Rest
 GDRP Article 4, which can also be found in Confluence under Chapter 1 Article 4.
 
