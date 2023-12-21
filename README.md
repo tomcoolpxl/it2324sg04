@@ -533,7 +533,7 @@ kind: Gateway
 ## Armosec: E2E Kubernetes Security & Compliance
 
 ```sh
-helm repo add kubescape https://kubescape.github.io/helm-charts/ ; helm repo update ; helm upgrade --install kubescape kubescape/kubescape-operator -n kubescape --create-namespace --set clusterName=`kubectl config current-context` --set account=6f5b87ed-38d2-4bc0-b5d6-fb3fa2c80d23 --set server=api.armosec.io
+helm repo add kubescape https://kubescape.github.io/helm-charts/ ; helm repo update ; helm upgrade --install kubescape kubescape/kubescape-operator -n kubescape --create-namespace --set clusterName=`kubectl config current-context` --set account=<id> --set server=api.armosec.io
 ```
 
 The comand above installs the kubescape operator on the cluster. So that it can be used to scan the cluster for vulnerabilities.
