@@ -540,7 +540,12 @@ The comand above installs the kubescape operator on the cluster. So that it can 
 
 The `account` and `server` values are obtained from the Armosec console. The `clusterName` is the name of the cluster, which can be obtained with `kubectl config current-context`.
 
-We use kubespace to scan the cluster for vulnerabilities. 
+Armosec operates as a Kubernetes operator, continuously monitoring and securing your cluster. Here's a brief overview of how Armosec works:
+
+Armosec deploys lightweight agents on each node in your Kubernetes cluster.
+These agents collect runtime data and communicate with the Armosec platform. It also assesses the risk level of your Kubernetes resources by analyzing their configurations and runtime behavior.
+
+The Armosec platform analyzes the data collected by the agents and provides you with a comprehensive view of your cluster's security posture.
 
 ![armosec](./assets/images/armosec.png)
 ![armosec2](./assets/images/armosec2.png)
